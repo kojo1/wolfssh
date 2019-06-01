@@ -882,10 +882,12 @@ static const NameIdPair NameIdMap[] = {
     { ID_HMAC_SHA1, "hmac-sha1" },
     { ID_HMAC_SHA1_96, "hmac-sha1-96" },
     { ID_HMAC_SHA2_256, "hmac-sha2-256" },
+    { ID_HMAC_SHA2_512, "hmac-sha2-512" },
 
     /* Key Exchange IDs */
     { ID_DH_GROUP1_SHA1, "diffie-hellman-group1-sha1" },
     { ID_DH_GROUP14_SHA1, "diffie-hellman-group14-sha1" },
+    { ID_DH_GROUP14_SHA256, "diffie-hellman-group14-sha256" },
     { ID_DH_GEX_SHA256, "diffie-hellman-group-exchange-sha256" },
     { ID_ECDH_SHA2_NISTP256, "ecdh-sha2-nistp256" },
     { ID_ECDH_SHA2_NISTP384, "ecdh-sha2-nistp384" },
@@ -1745,6 +1747,9 @@ static const byte cannedMacAlgo[] = {
 #ifndef WOLFSSH_NO_HMAC_SHA2_256
     ID_HMAC_SHA2_256,
 #endif
+#ifndef WOLFSSH_NO_HMAC_SHA2_512
+    ID_HMAC_SHA2_512,
+#endif
 #ifndef WOLFSSH_NO_HMAC_SHA1_96
     ID_HMAC_SHA1_96,
 #endif
@@ -1766,6 +1771,9 @@ static const byte  cannedKeyAlgoEcc521[] = {ID_ECDSA_SHA2_NISTP521};
 #if defined(NO_DH) || defined(NO_SHA)
     #define WOLFSSH_NO_DH_GROUP14_SHA1
 #endif
+#if defined(NO_DH) || defined(NO_SHA256)
+   #define WOLFSSH_NO_DH_GROUP14_SHA256
+#endif
 #if defined(NO_DH) || defined(NO_SHA)
     #define WOLFSSH_NO_DH_GROUP1_SHA1
 #endif
@@ -1779,6 +1787,9 @@ static const byte cannedKexAlgo[] = {
 #endif
 #ifndef WOLFSSH_NO_DH_GROUP14_SHA1
     ID_DH_GROUP14_SHA1,
+#endif
+#ifndef WOLFSSH_NO_DH_GROUP14_SHA256
+    ID_DH_GROUP14_SHA256,
 #endif
 #ifndef WOLFSSH_NO_DH_GROUP1_SHA1
     ID_DH_GROUP1_SHA1,
@@ -1850,6 +1861,8 @@ static INLINE byte MacSzForId(byte id)
             return SHA1_96_SZ;
         case ID_HMAC_SHA2_256:
             return SHA256_DIGEST_SIZE;
+        case ID_HMAC_SHA2_512:
+            return SHA512_DIGEST_SIZE;
         default:
             return 0;
     }
@@ -1864,6 +1877,8 @@ static INLINE byte KeySzForId(byte id)
             return SHA_DIGEST_SIZE;
         case ID_HMAC_SHA2_256:
             return SHA256_DIGEST_SIZE;
+        case ID_HMAC_SHA2_512:
+            return SHA512_DIGEST_SIZE;
         case ID_AES128_CBC:
         case ID_AES128_CTR:
         case ID_AES128_GCM:
@@ -1882,6 +1897,7 @@ static INLINE enum wc_HashType HashForId(byte id)
         case ID_SSH_RSA:
             return WC_HASH_TYPE_SHA;
         case ID_DH_GEX_SHA256:
+        case ID_DH_GROUP14_SHA256:
         case ID_ECDH_SHA2_NISTP256:
         case ID_ECDSA_SHA2_NISTP256:
             return WC_HASH_TYPE_SHA256;
@@ -1942,7 +1958,7 @@ static int DoKexInit(WOLFSSH* ssh, byte* buf, word32 len, word32* idx)
     int ret = WS_SUCCESS;
     int side;
     byte algoId;
-    byte list[6];
+    byte list[10];
     word32 listSz;
     word32 skipSz;
     word32 begin;
@@ -4789,6 +4805,22 @@ static INLINE int CreateMac(WOLFSSH* ssh, const byte* in, word32 inSz,
             }
             break;
 
+        case ID_HMAC_SHA2_512:
+            {
+                Hmac hmac;
+
+                ret = wc_HmacSetKey(&hmac, WC_SHA512,
+                                    ssh->keys.macKey,
+                                    ssh->keys.macKeySz);
+                if (ret == WS_SUCCESS)
+                    ret = wc_HmacUpdate(&hmac, flatSeq, sizeof(flatSeq));
+                if (ret == WS_SUCCESS)
+                    ret = wc_HmacUpdate(&hmac, in, inSz);
+                if (ret == WS_SUCCESS)
+                    ret = wc_HmacFinal(&hmac, mac);
+            }
+            break;
+
         default:
             WLOG(WS_LOG_DEBUG, "Invalid Mac ID");
             ret = WS_FATAL_ERROR;
@@ -4836,6 +4868,19 @@ static INLINE int VerifyMac(WOLFSSH* ssh, const byte* in, word32 inSz,
 
         case ID_HMAC_SHA2_256:
             ret = wc_HmacSetKey(&hmac, WC_SHA256,
+                                ssh->peerKeys.macKey, ssh->peerKeys.macKeySz);
+            if (ret == WS_SUCCESS)
+                ret = wc_HmacUpdate(&hmac, flatSeq, sizeof(flatSeq));
+            if (ret == WS_SUCCESS)
+                ret = wc_HmacUpdate(&hmac, in, inSz);
+            if (ret == WS_SUCCESS)
+                ret = wc_HmacFinal(&hmac, checkMac);
+            if (ConstantCompare(checkMac, mac, ssh->peerMacSz) != 0)
+                ret = WS_VERIFY_MAC_E;
+            break;
+
+        case ID_HMAC_SHA2_512:
+            ret = wc_HmacSetKey(&hmac, WC_SHA512,
                                 ssh->peerKeys.macKey, ssh->peerKeys.macKeySz);
             if (ret == WS_SUCCESS)
                 ret = wc_HmacUpdate(&hmac, flatSeq, sizeof(flatSeq));
@@ -5330,6 +5375,9 @@ static const char cannedMacAlgoNames[] =
 #if !defined(WOLFSSH_NO_HMAC_SHA2_256)
     "hmac-sha2-256"
 #endif
+#if !defined(WOLFSSH_NO_HMAC_SHA2_512)
+    "hmac-sha2-512"
+#endif
 #if !defined(WOLFSSH_NO_HMAC_SHA2_256) && !defined(WOLFSSH_NO_HMAC_SHA1_96)
     ","
 #endif
@@ -5357,33 +5405,50 @@ static const char cannedKexAlgoNames[] =
 #if !defined(WOLFSSH_NO_ECDH_SHA2_NISTP256)
     "ecdh-sha2-nistp256"
 #endif
-#if !defined(WOLFSSH_NO_ECDH_SHA2_NISTP256) && !defined(WOLFSSH_NO_ECDH_GEX_SHA256)
+#if !defined(WOLFSSH_NO_ECDH_SHA2_NISTP256) && !defined(WOLFSSH_NO_ECDH_SHA2_NISTP512)
+    ","
+#endif
+#if !defined(WOLFSSH_NO_ECDH_SHA2_NISTP512)
+    "ecdh-sha2-nistp512"
+#endif
+#if (!defined(WOLFSSH_NO_ECDH_SHA2_NISTP256) || !defined(WOLFSSH_NO_ECDH_SHA2_NISTP512))\
+  && !defined(WOLFSSH_NO_ECDH_GEX_SHA256)
     ","
 #endif
 #if !defined(WOLFSSH_NO_ECDH_GEX_SHA256)
     "diffie-hellman-group-exchange-sha256"
 #endif
-#if (!defined(WOLFSSH_NO_ECDH_SHA2_NISTP256) || !defined(WOLFSSH_NO_ECDH_GEX_SHA256))\
-                                             && !defined(WOLFSSH_NO_ECDH_GROUP14_SHA1)
+#if (!defined(WOLFSSH_NO_ECDH_SHA2_NISTP256) || !defined(WOLFSSH_NO_ECDH_SHA2_NISTP512)\
+  || !defined(WOLFSSH_NO_ECDH_GEX_SHA256)) && !defined(WOLFSSH_NO_ECDH_GROUP14_SHA1)
     ","
 #endif
 #if !defined(WOLFSSH_NO_ECDH_GROUP14_SHA1)
     "diffie-hellman-group14-sha1"
 #endif
-#if (!defined(WOLFSSH_NO_ECDH_SHA2_NISTP256) || !defined(WOLFSSH_NO_ECDH_GEX_SHA256) \
-  || !defined(WOLFSSH_NO_ECDH_GROUP14_SHA1)) && !defined(WOLFSSH_NO_ECDH_GROUP1_SHA1)
+#if (!defined(WOLFSSH_NO_ECDH_SHA2_NISTP256) || !defined(WOLFSSH_NO_ECDH_SHA2_NISTP512)\
+  || !defined(WOLFSSH_NO_ECDH_GEX_SHA256) || !defined(WOLFSSH_NO_ECDH_GROUP14_SHA1))\
+  && !defined(WOLFSSH_NO_ECDH_GROUP14_SHA256)
+    ","
+#endif
+#if !defined(WOLFSSH_NO_ECDH_GROUP14_SHA256)
+    "diffie-hellman-group14-sha256"
+#endif
+#if (!defined(WOLFSSH_NO_ECDH_SHA2_NISTP256) || !defined(WOLFSSH_NO_ECDH_SHA2_NISTP512)\
+  || !defined(WOLFSSH_NO_ECDH_GEX_SHA256) || !defined(WOLFSSH_NO_ECDH_GROUP14_SHA1)\
+  || !defined(WOLFSSH_NO_ECDH_GROUP14_SHA256)) && !defined(WOLFSSH_NO_ECDH_GROUP1_SHA1)
     ","
 #endif
 #if !defined(WOLFSSH_NO_ECDH_GROUP1_SHA1)
     "diffie-hellman-group1-sha1";
 #endif
-#if defined(WOLFSSH_NO_ECDH_SHA2_NISTP256) && defined(WOLFSSH_NO_ECDH_GEX_SHA256)\
- && defined(WOLFSSH_NO_ECDH_GROUP14_SHA1)  && defined(WOLFSSH_NO_ECDH_GROUP1_SHA1)
-    #warning "You need at least one of ECDH-SHA2-NISTP256, ECDH-GEX-SHA256, "
-             "ECDH_GROUP14-SHA1 or ECDH-GROUP1-SHA1"
+#if defined(WOLFSSH_NO_ECDH_SHA2_NISTP256) && defined(WOLFSSH_NO_ECDH_SHA2_NISTP512)\
+    && defined(WOLFSSH_NO_ECDH_GEX_SHA256) && defined(WOLFSSH_NO_ECDH_GROUP14_SHA1)\
+    && defined(WOLFSSH_NO_ECDH_GROUP14_SHA256) && defined(WOLFSSH_NO_ECDH_GROUP1_SHA1)
+#warning "You need at least one of ECDH-SHA2-NISTP256, ECDH-SHA2-NISTP512, ECDH-GEX-SHA256, "
+"ECDH_GROUP14-SHA1, ECDH_GROUP14-SHA256 or ECDH-GROUP1-SHA1"
 #endif
 
-static const char cannedNoneNames[] = "none";
+    static const char cannedNoneNames[] = "none";
 
 static const word32 cannedEncAlgoNamesSz = sizeof(cannedEncAlgoNames) - 1;
 static const word32 cannedMacAlgoNamesSz = sizeof(cannedMacAlgoNames) - 1;
@@ -5589,6 +5654,7 @@ int SendKexDhReply(WOLFSSH* ssh)
             break;
 
         case ID_DH_GROUP14_SHA1:
+        case ID_DH_GROUP14_SHA256:
             /* This is the default case. */
             break;
 
@@ -6353,6 +6419,7 @@ int SendKexDhInit(WOLFSSH* ssh)
             break;
 
         case ID_DH_GROUP14_SHA1:
+        case ID_DH_GROUP14_SHA256:
             /* This is the default case. */
             break;
 
