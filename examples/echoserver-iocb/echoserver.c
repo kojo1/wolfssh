@@ -35,26 +35,12 @@
 
 #include <examples/echoserver-iocb/echoserver.h>
 #include <examples/echoserver-iocb/pw-key.h>
-<<<<<<< Updated upstream
-#include <examples/echoserver-iocb/test.h>
 #include <examples/echoserver-iocb/my-iocb.h>
-
-#define  NO_FILESYSTEM
-#include <wolfssh/certs_test.h>
-
-#if !defined(WOLFSSH_USER_IO)
-      #warning "examples/echoserver-iocb/echoserver is for User IO Callback for TCP"
-#endif
-
-=======
-#include <examples/echoserver-iocb/my-iocb.h>
-
 #include <examples/echoserver-iocb/test.h>
 
 #define  NO_FILESYSTEM
 #include <wolfssh/certs_test.h>
 
->>>>>>> Stashed changes
 #ifndef NO_WOLFSSH_SERVER
 
 static const char echoserverBanner[] = "wolfSSH Example Echo Server\n";
@@ -363,10 +349,15 @@ int echoserver_test(int argc, char **argv)
     LoadPw(&pwMapList, userEcc);
 
     do {
+#ifdef USE_SOCKET
         SOCKET_T      sockFd = 0;
         SOCKET_T      clientFd = 0;
         SOCKADDR_IN_T addr;
         SOCKLEN_T     addrSz = sizeof(SOCKADDR_IN_T);
+#else
+        int clientFd;
+#endif
+
         WOLFSSH*      ssh;
 
         #ifdef USE_SOCKET
@@ -379,6 +370,9 @@ int echoserver_test(int argc, char **argv)
                 err_sys("tcp bind failed");
             if (listen(sockFd, 1) != 0)
                 err_sys("tcp listen failed");
+            clientFd = accept(sockFd, (struct sockaddr *)&addr, &addrSz);
+            if (clientFd == -1)
+                err_sys("tcp accept failed");
         #else
             /* your own TCP socket */
         #endif
@@ -389,12 +383,12 @@ int echoserver_test(int argc, char **argv)
         }
         wolfSSH_SetUserAuthCtx(ssh, &pwMapList);
 
-        clientFd = accept(sockFd, (struct sockaddr *)&addr, &addrSz);
-
-        if (clientFd == -1)
-            err_sys("tcp accept failed");
-
+        #ifdef USE_SOCKET
         wolfSSH_set_fd(ssh, (int)clientFd);
+        #else
+        wolfSSH_SetIOReadCtx(ssh, (void *)&clientFd);
+        wolfSSH_SetIOWriteCtx(ssh, (void *)&clientFd);
+        #endif
 
         server_worker(ssh);
 

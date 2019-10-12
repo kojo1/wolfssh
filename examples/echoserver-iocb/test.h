@@ -21,23 +21,7 @@
 #ifndef WOLFSSH_TEST_H
 #define WOLFSSH_TEST_H
 
-<<<<<<< Updated upstream
 #ifdef USE_SOCKET
-    #define WOLFSSH_USER_IO
-    #include <unistd.h>
-    #include <netdb.h>
-    #include <netinet/in.h>
-    #include <netinet/tcp.h>
-    #include <arpa/inet.h>
-    #include <sys/ioctl.h>
-    #include <sys/socket.h>
-    #include <sys/errno.h>
-    #define SOCKET_T int
-    #define SOCKLEN_T socklen_t
-    #define AF_INET_V AF_INET
-    typedef struct sockaddr_in SOCKADDR_IN_T;
-#endif
-=======
 #define WOLFSSH_USER_IO
 #include <unistd.h>
 #include <netdb.h>
@@ -51,7 +35,8 @@
 #define SOCKLEN_T socklen_t
 #define AF_INET_V AF_INET
 typedef struct sockaddr_in SOCKADDR_IN_T;
->>>>>>> Stashed changes
+
+#endif
 
 static int err_sys(const char* msg)
 {

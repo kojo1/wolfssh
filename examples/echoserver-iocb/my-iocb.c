@@ -23,12 +23,15 @@
 
 #include <examples/echoserver-iocb/my-iocb.h>
 
+#ifdef USE_SOCKET
 #include <sys/socket.h>
 #include <sys/errno.h>
+#endif
 
 int my_IORecv(WOLFSSH *ssh, char *buff, int sz, void *ctx)
 {
-    /* By default, ctx will be a pointer to the file descriptor to read from.
+#ifdef USE_SOCKET
+	/* By default, ctx will be a pointer to the file descriptor to read from.
      * This can be changed by calling wolfSSL_SetIOReadCtx(). */
     int sockfd = *(int *)ctx;
     int recvd;
@@ -67,15 +70,21 @@ int my_IORecv(WOLFSSH *ssh, char *buff, int sz, void *ctx)
         printf("Connection closed\n");
         return WS_CBIO_ERR_CONN_CLOSE;
     }
+#else
+    (void) ssh;
+    (void) buff;
+    int recvd = sz;
+#endif
 
     /* successful receive */
-    printf("my_IORecv: received %d bytes from %d\n", sz, sockfd);
+    printf("my_IORecv: received %d bytes from %d\n", sz, *(int *)ctx);
     return recvd;
 }
 
 int my_IOSend(WOLFSSH *ssh, char *buff, int sz, void *ctx)
 {
-    /* By default, ctx will be a pointer to the file descriptor to write to.
+#ifdef USE_SOCKET
+	/* By default, ctx will be a pointer to the file descriptor to write to.
      * This can be changed by calling wolfSSL_SetIOWriteCtx(). */
     int sockfd = *(int *)ctx;
     int sent;
@@ -112,7 +121,13 @@ int my_IOSend(WOLFSSH *ssh, char *buff, int sz, void *ctx)
         return 0;
     }
 
+#else
+    (void) ssh;
+    (void) buff;
+    int sent = sz;
+#endif
+
     /* successful send */
-    printf("my_IOSend: sent %d bytes to %d\n", sz, sockfd);
+    printf("my_IOSend: sent %d bytes to %d\n", sz, *(int *)ctx);
     return sent;
 }
