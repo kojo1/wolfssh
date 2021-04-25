@@ -36,7 +36,7 @@
                 </option>
                 <option>
                     <name>Output description</name>
-                    <state>Full formatting, without multibyte support.</state>
+                    <state>Automatic choice of formatter, without multibyte support.</state>
                 </option>
                 <option>
                     <name>GOutputBinary</name>
@@ -173,7 +173,7 @@
                 <option>
                     <name>OGPrintfVariant</name>
                     <version>0</version>
-                    <state>1</state>
+                    <state>0</state>
                 </option>
                 <option>
                     <name>OGPrintfMultibyteSupport</name>
@@ -220,7 +220,8 @@
                 <debug>1</debug>
                 <option>
                     <name>CCDefines</name>
-                    <state>WOLFSSL_USER_SETTINGS</state>
+                    <state>WOLFSSL_USER_SETTINGS
+</state>
                 </option>
                 <option>
                     <name>CCPreprocFile</name>
@@ -337,7 +338,7 @@
                 </option>
                 <option>
                     <name>PreInclude</name>
-                    <state></state>
+                    <state>C:\wolfSupport\PALTEK\wolfssh\ide\IAR-EWARM\Projects\echoserver_user_io.h</state>
                 </option>
                 <option>
                     <name>CompilerMisraOverride</name>
@@ -348,6 +349,8 @@
                     <state>$PROJ_DIR$\..\..\..\..</state>
                     <state>$PROJ_DIR$\..\..\..\..\..\wolfssl</state>
                     <state>$PROJ_DIR$\..</state>
+                    <state>$PROJ_DIR$\..\lib</state>
+                    <state>$PROJ_DIR$\..\dummy_headers</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -2116,8 +2119,5 @@
     </configuration>
     <file>
         <name>$PROJ_DIR$\..\..\..\..\examples\echoserver\echoserver.c</name>
-    </file>
-    <file>
-        <name>$PROJ_DIR$\..\myFilesystem.c</name>
     </file>
 </project>

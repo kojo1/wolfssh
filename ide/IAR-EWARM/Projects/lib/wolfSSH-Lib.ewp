@@ -337,7 +337,7 @@
                 </option>
                 <option>
                     <name>PreInclude</name>
-                    <state>stddef.h</state>
+                    <state></state>
                 </option>
                 <option>
                     <name>CompilerMisraOverride</name>
@@ -348,6 +348,7 @@
                     <state>$PROJ_DIR$\..</state>
                     <state>$PROJ_DIR$\..\..\..\..</state>
                     <state>$PROJ_DIR$\..\..\..\..\..\wolfssl</state>
+                    <state>$PROJ_DIR$</state>
                 </option>
                 <option>
                     <name>CCStdIncCheck</name>
@@ -1048,7 +1049,7 @@
                 </option>
                 <option>
                     <name>IarchiveOutput</name>
-                    <state>C:\wolfSupport\PALSYSTEM\wolfssh\ide\IAR-EWARM\Projects\lib\Debug\Exe\wolfSSH-Lib.a</state>
+                    <state>C:\wolfSupport\PALTEK\wolfssh\ide\IAR-EWARM\Projects\lib\Debug\Exe\wolfSSH-Lib.a</state>
                 </option>
             </data>
         </settings>

@@ -2811,27 +2811,6 @@ static int wolfSSH_SFTP_SendName(WOLFSSH* ssh, WS_SFTPNAME* list, word32 count,
     return WS_SUCCESS;
 }
 
-
-int wolfSSH_SFTP_SetDefaultPath(WOLFSSH* ssh, const char* path)
-{
-    if (ssh == NULL)
-        return WS_BAD_ARGUMENT;
-
-    if (path != NULL) {
-        word32 sftpDefaultPathSz;
-        sftpDefaultPathSz = (word32)XSTRLEN(path) + 1;
-        ssh->sftpDefaultPath = (char*)WMALLOC(sftpDefaultPathSz,
-                ssh->ctx->heap, DYNTYPE_STRING);
-        if (ssh->sftpDefaultPath == NULL) {
-            ssh->error = WS_MEMORY_E;
-            return WS_FATAL_ERROR;
-        }
-        XSTRNCPY(ssh->sftpDefaultPath, path, sftpDefaultPathSz);
-    }
-    return WS_SUCCESS;
-}
-
-
 /* Handles packet to read a directory
  *
  * returns WS_SUCCESS on success
@@ -3015,6 +2994,25 @@ int wolfSSH_SFTP_RecvCloseDir(WOLFSSH* ssh, byte* handle, word32 handleSz)
     return WS_SUCCESS;
 }
 #endif /* NO_WOLFSSH_DIR */
+
+int wolfSSH_SFTP_SetDefaultPath(WOLFSSH* ssh, const char* path)
+{
+    if (ssh == NULL)
+        return WS_BAD_ARGUMENT;
+
+    if (path != NULL) {
+        word32 sftpDefaultPathSz;
+        sftpDefaultPathSz = (word32)XSTRLEN(path) + 1;
+        ssh->sftpDefaultPath = (char*)WMALLOC(sftpDefaultPathSz,
+                ssh->ctx->heap, DYNTYPE_STRING);
+        if (ssh->sftpDefaultPath == NULL) {
+            ssh->error = WS_MEMORY_E;
+            return WS_FATAL_ERROR;
+        }
+        XSTRNCPY(ssh->sftpDefaultPath, path, sftpDefaultPathSz);
+    }
+    return WS_SUCCESS;
+}
 
 /* Handles packet to write a file
  *

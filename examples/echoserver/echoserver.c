@@ -31,21 +31,15 @@
     #include <wolfssl/options.h>
 #endif
 
-#include <wolfssl/wolfcrypt/types.h>
 #include <wolfssl/wolfcrypt/hash.h>
 #include <wolfssl/wolfcrypt/coding.h>
 #include <wolfssl/wolfcrypt/wc_port.h>
 #include <wolfssh/ssh.h>
 #include <wolfssh/wolfsftp.h>
 #include <wolfssh/agent.h>
-
-#ifndef WOLFSSH_USER_IO
 #include <wolfssh/test.h>
-#else
-#include <test_user_io.h>
-#endif
-
 #include <wolfssl/wolfcrypt/ecc.h>
+
 #include "examples/echoserver/echoserver.h"
 
 #if defined(WOLFSSL_PTHREADS) && defined(WOLFSSL_TEST_GLOBAL_REQ)
@@ -136,82 +130,6 @@ typedef struct {
 #define SCRATCH_BUFFER_SZ 1200
 
 
-#ifdef WOLFSSH_USER_IO
-
-int my_IORecv(WOLFSSH* ssh, void* buff, word32 sz, void* ctx)
-{
-    /* ctx can be changed by calling wolfSSH_SetIOReadCtx() or wolfSSH_set_fd(). */
-    int sockfd = *(int*)ctx;
-    int recvd;
-
-#define XRECV(fd,b,sz,flg) (1) /* To be defined for the target platform */
-#define RCV_ERROR recvd
-#define EWOULDBLOCK -1
-
-    /* Receive message from socket */
-    if ((recvd = XRECV(sockfd, buff, sz, 0)) < 0) {
-        /* report it in wolfSSL terms */
-        XFPRINTF(stderr, "IO RECEIVE ERROR: ");
-        switch (RCV_ERROR) {
-        case EWOULDBLOCK:
-            XFPRINTF(stderr, "would block\n");
-            return WS_CBIO_ERR_WANT_READ;
-            /* Time out for blocking mode 
-            XFPRINTF(stderr, "socket timeout\n");
-            return WS_CBIO_ERR_TIMEOUT;
-            */
-        default:
-            XFPRINTF(stderr, "general error\n");
-            return WS_CBIO_ERR_GENERAL;
-        }
-    }
-    else if (recvd == 0) {
-        XFPRINTF(stderr, "Connection closed\n");
-        return WS_CBIO_ERR_CONN_CLOSE;
-    }
-
-    /* successful receive */
-    XFPRINTF(stderr, "my_IORecv: received %d bytes from %d\n", sz, sockfd);
-    return recvd;
-}
-
-int my_IOSend(WOLFSSH* ssh, void* buff, word32 sz, void* ctx)
-{
-    /* ctx can be changed by calling wolfSSH_SetIOWriteCtx() or wolfSSH_set_fd(). */
-    int sockfd = *(int*)ctx;
-    int sent;
-
-#define XSEND(fd,b,sz,flg) (1) /* To be defined for the target platform */
-#define SEND_ERROR sent
-
-    /* Receive message from socket */
-    if ((sent = XSEND(sockfd, buff, sz, 0)) < 0) {
-        /* report it in wolfSSL terms */
-        XFPRINTF(stderr, "IO SEND ERROR: ");
-        switch (SEND_ERROR) {
-        case EWOULDBLOCK:
-            XFPRINTF(stderr, "would block\n");
-            return WS_CBIO_ERR_WANT_READ;
-            /* Time out for blocking mode
-            XFPRINTF(stderr, "socket timeout\n");
-            return WS_CBIO_ERR_TIMEOUT;
-            */
-        default:
-            XFPRINTF(stderr, "general error\n");
-            return WS_CBIO_ERR_GENERAL;
-        }
-    }
-    else if (sent == 0) {
-        XFPRINTF(stderr, "Connection closed\n");
-        return 0;
-    }
-
-    /* successful send */
-    XFPRINTF(stderr, "my_IOSend: sent %d bytes to %d\n", sz, sockfd);
-    return sent;
-}
-#endif
-
 static byte find_char(const byte* str, const byte* buf, word32 bufSz)
 {
     const byte* cur;
@@ -230,6 +148,7 @@ static byte find_char(const byte* str, const byte* buf, word32 bufSz)
     return 0;
 }
 
+
 static int dump_stats(thread_ctx_t* ctx)
 {
     char stats[1024];
@@ -245,7 +164,7 @@ static int dump_stats(thread_ctx_t* ctx)
             ctx->id, txCount, rxCount, seq, peerSeq);
     statsSz = (word32)strlen(stats);
 
-    XFPRINTF(stderr, "%s", stats);
+    fprintf(stderr, "%s", stats);
     return wolfSSH_stream_send(ctx->ssh, (byte*)stats, statsSz);
 }
 
@@ -344,7 +263,6 @@ static int ssh_worker(thread_ctx_t* threadCtx) {
             buf = tmpBuf;
 
         if (!stop) {
-            #ifndef WOLFSSH_USER_IO
             if (threadCtx->nonBlock) {
                 WS_SOCKET_T sockfd;
                 int select_ret = 0;
@@ -358,9 +276,6 @@ static int ssh_worker(thread_ctx_t* threadCtx) {
                     break;
                 }
             }
-            #else
-            /* for USER_IO */
-            #endif
 
             rxSz = wolfSSH_stream_read(threadCtx->ssh,
                                        buf + backlogSz,
@@ -984,16 +899,10 @@ static int sftp_worker(thread_ctx_t* threadCtx) {
     byte tmp[1];
     int ret   = WS_SUCCESS;
     int error = WS_SUCCESS;
-    #ifndef WOLFSSH_USER_IO
     WS_SOCKET_T sockfd;
-    #endif
     int select_ret = 0;
 
-    #ifndef WOLFSSH_USER_IO
     sockfd = (WS_SOCKET_T)wolfSSH_get_fd(threadCtx->ssh);
-    #else
-    /* for USER_IO */
-    #endif
     do {
         if (threadCtx->nonBlock) {
             if (error == WS_WANT_READ)
@@ -1006,11 +915,7 @@ static int sftp_worker(thread_ctx_t* threadCtx) {
             select_ret = WS_SELECT_RECV_READY;
         }
         else {
-            #ifndef WOLFSSH_USER_IO
             select_ret = tcp_select(sockfd, TEST_SFTP_TIMEOUT);
-            #else
-            /* for USER_IO */
-            #endif
         }
 
         if (select_ret == WS_SELECT_RECV_READY ||
@@ -1047,22 +952,12 @@ static int NonBlockSSH_accept(WOLFSSH* ssh)
 {
     int ret;
     int error;
-    
-    #ifndef WOLFSSH_USER_IO
     WS_SOCKET_T sockfd;
     int select_ret = 0;
-    #else
-    /* for USER_IO */
-    #endif
 
     ret = wolfSSH_accept(ssh);
     error = wolfSSH_get_error(ssh);
-
-    #ifndef WOLFSSH_USER_IO
     sockfd = (WS_SOCKET_T)wolfSSH_get_fd(ssh);
-    #else
-    /* for USER_IO */
-    #endif
 
     while ((ret != WS_SUCCESS
                 && ret != WS_SCP_COMPLETE && ret != WS_SFTP_COMPLETE)
@@ -1073,7 +968,6 @@ static int NonBlockSSH_accept(WOLFSSH* ssh)
         else if (error == WS_WANT_WRITE)
             printf("... server would write block\n");
 
-        #ifndef WOLFSSH_USER_IO
         select_ret = tcp_select(sockfd, 1);
         if (select_ret == WS_SELECT_RECV_READY  ||
             select_ret == WS_SELECT_ERROR_READY ||
@@ -1086,12 +980,6 @@ static int NonBlockSSH_accept(WOLFSSH* ssh)
             error = WS_WANT_READ;
         else
             error = WS_FATAL_ERROR;
-        #else
-            /* for USER_IO */
-            ret = wolfSSH_accept(ssh);
-            error = wolfSSH_get_error(ssh);
-        #endif
-
     }
 
     return ret;
@@ -1163,7 +1051,7 @@ static THREAD_RETURN WOLFSSH_THREAD server_worker(void* vArgs)
 
     if (error != WS_SOCKET_ERROR_E && error != WS_FATAL_ERROR) {
         if (wolfSSH_shutdown(threadCtx->ssh) != WS_SUCCESS) {
-            XFPRINTF(stderr, "Error with SSH shutdown.\n");
+            fprintf(stderr, "Error with SSH shutdown.\n");
         }
     }
 
@@ -1171,7 +1059,7 @@ static THREAD_RETURN WOLFSSH_THREAD server_worker(void* vArgs)
     wolfSSH_free(threadCtx->ssh);
 
     if (ret != 0) {
-        XFPRINTF(stderr, "Error [%d] \"%s\" with handling connection.\n", ret,
+        fprintf(stderr, "Error [%d] \"%s\" with handling connection.\n", ret,
                 wolfSSH_ErrorToName(error));
     #ifndef WOLFSSH_NO_EXIT
         wc_LockMutex(&doneLock);
@@ -1196,22 +1084,22 @@ static int load_file(const char* fileName, byte* buf, word32 bufSz)
 
     if (WFOPEN(&file, fileName, "rb") != 0)
         return 0;
-    WFSEEK(file, 0, WSEEK_END);
-    fileSz = (word32)WFTELL(file);
-    WREWIND(file);
+    fseek(file, 0, XSEEK_END);
+    fileSz = (word32)ftell(file);
+    rewind(file);
 
     if (fileSz > bufSz) {
-        WFCLOSE(file);
+        fclose(file);
         return 0;
     }
 
-    readSz = (word32)WFREAD(buf, 1, fileSz, file);
+    readSz = (word32)fread(buf, 1, fileSz, file);
     if (readSz < fileSz) {
-        WFCLOSE(file);
+        fclose(file);
         return 0;
     }
 
-    WFCLOSE(file);
+    fclose(file);
 
     return fileSz;
 }
@@ -1513,7 +1401,7 @@ static int wsUserAuth(byte authType,
     int ret;
 
     if (ctx == NULL) {
-        XFPRINTF(stderr, "wsUserAuth: ctx not set");
+        fprintf(stderr, "wsUserAuth: ctx not set");
         return WOLFSSH_USERAUTH_FAILURE;
     }
 
@@ -1618,7 +1506,7 @@ static void ShowUsage(void)
 #endif
 }
 
-#ifndef WOLFSSH_USER_IO
+
 static void SignalTcpReady(func_args* serverArgs, word16 port)
 {
 #if defined(_POSIX_THREADS) && defined(NO_MAIN_DRIVER) && !defined(__MINGW32__)
@@ -1633,16 +1521,14 @@ static void SignalTcpReady(func_args* serverArgs, word16 port)
     (void)port;
 #endif
 }
-#endif
+
 
 THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
 {
     func_args* serverArgs = (func_args*)args;
     WOLFSSH_CTX* ctx = NULL;
     PwMapList pwMapList;
-    #ifndef WOLFSSH_USER_IO
     WS_SOCKET_T listenFd = 0;
-    #endif
     word32 defaultHighwater = EXAMPLE_HIGHWATER_MARK;
     word32 threadCount = 0;
     int multipleConnections = 1;
@@ -1731,20 +1617,15 @@ THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
 #endif
 
     if (wolfSSH_Init() != WS_SUCCESS) {
-        XFPRINTF(stderr, "Couldn't initialize wolfSSH.\n");
+        fprintf(stderr, "Couldn't initialize wolfSSH.\n");
         exit(EXIT_FAILURE);
     }
 
     ctx = wolfSSH_CTX_new(WOLFSSH_ENDPOINT_SERVER, NULL);
     if (ctx == NULL) {
-        XFPRINTF(stderr, "Couldn't allocate SSH CTX data.\n");
+        fprintf(stderr, "Couldn't allocate SSH CTX data.\n");
         exit(EXIT_FAILURE);
     }
-
-    #ifdef WOLFSSL_USER_IO
-    wolfSSH_SetIORecv(ctx, my_IORecv);
-    wolfSSH_SetIOSend(ctx, my_IOSend);
-    #endif
 
     memset(&pwMapList, 0, sizeof(pwMapList));
     if (serverArgs->user_auth == NULL)
@@ -1763,12 +1644,12 @@ THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
 
         bufSz = load_key(peerEcc, buf, SCRATCH_BUFFER_SZ);
         if (bufSz == 0) {
-            XFPRINTF(stderr, "Couldn't load key file.\n");
+            fprintf(stderr, "Couldn't load key file.\n");
             exit(EXIT_FAILURE);
         }
         if (wolfSSH_CTX_UsePrivateKey_buffer(ctx, buf, bufSz,
                                              WOLFSSH_FORMAT_ASN1) < 0) {
-            XFPRINTF(stderr, "Couldn't use key buffer.\n");
+            fprintf(stderr, "Couldn't use key buffer.\n");
             exit(EXIT_FAILURE);
         }
 
@@ -1806,19 +1687,19 @@ THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
 
         /* wait for network and storage device */
         if (NETBOOT_Wait_For_Network_Up(NU_SUSPEND) != NU_SUCCESS) {
-            XFPRINTF(stderr, "Couldn't find network.\r\n");
+            fprintf(stderr, "Couldn't find network.\r\n");
             exit(EXIT_FAILURE);
         }
 
         for(i = 0; i < 15 && ret != NU_SUCCESS; i++)
         {
-            XFPRINTF(stdout, "Checking for storage device\r\n");
+            fprintf(stdout, "Checking for storage device\r\n");
 
             ret = NU_Storage_Device_Wait(NU_NULL, NU_PLUS_TICKS_PER_SEC);
         }
 
         if (ret != NU_SUCCESS) {
-            XFPRINTF(stderr, "Couldn't find storage device.\r\n");
+            fprintf(stderr, "Couldn't find storage device.\r\n");
             exit(EXIT_FAILURE);
         }
     }
@@ -1827,25 +1708,20 @@ THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
     /* if creating a ready file with port then override port to be 0 */
     if (readyFile != NULL) {
     #ifdef NO_FILESYSTEM
-        XFPRINTF(stderr, "cannot create readyFile with no file system.\r\n");
+        fprintf(stderr, "cannot create readyFile with no file system.\r\n");
         exit(EXIT_FAILURE);
     #endif
         port = 0;
     }
-    #ifndef WOLFSSH_USER_IO
     tcp_listen(&listenFd, &port, 1);
     /* write out port number listing to, to user set ready file */
-    #else
-    /* for USER_IO */
-    #endif
-
     if (readyFile != NULL) {
     #ifndef NO_FILESYSTEM
         WFILE* f = NULL;
         int    ret;
         ret = WFOPEN(&f, readyFile, "w");
         if (f != NULL && ret == 0) {
-            XFPRINTF(f, "%d\n", (int)port);
+            fprintf(f, "%d\n", (int)port);
             WFCLOSE(f);
         }
     #endif
@@ -1853,9 +1729,9 @@ THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
 
     do {
         WS_SOCKET_T      clientFd = 0;
-    #if defined(WOLFSSL_NUCLEUS)
+    #ifdef WOLFSSL_NUCLEUS
         struct addr_struct clientAddr;
-    #elif !defined(WOLFSSH_USER_IO)
+    #else
         SOCKADDR_IN_T clientAddr;
         socklen_t     clientAddrSz = sizeof(clientAddr);
     #endif
@@ -1864,14 +1740,14 @@ THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
 
         threadCtx = (thread_ctx_t*)malloc(sizeof(thread_ctx_t));
         if (threadCtx == NULL) {
-            XFPRINTF(stderr, "Couldn't allocate thread context data.\n");
+            fprintf(stderr, "Couldn't allocate thread context data.\n");
             exit(EXIT_FAILURE);
         }
 
         ssh = wolfSSH_new(ctx);
         if (ssh == NULL) {
             free(threadCtx);
-            XFPRINTF(stderr, "Couldn't allocate SSH data.\n");
+            fprintf(stderr, "Couldn't allocate SSH data.\n");
             exit(EXIT_FAILURE);
         }
         wolfSSH_SetUserAuthCtx(ssh, &pwMapList);
@@ -1881,11 +1757,11 @@ THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
             wolfSSH_SetHighwater(ssh, defaultHighwater);
         }
 
-    #if defined(WOLFSSH_SFTP) && !defined(NO_WOLFSSH_DIR)
+    #ifdef WOLFSSH_SFTP
         if (defaultSftpPath) {
             if (wolfSSH_SFTP_SetDefaultPath(ssh, defaultSftpPath)
                     != WS_SUCCESS) {
-                XFPRINTF(stderr, "Couldn't store default sftp path.\n");
+                fprintf(stderr, "Couldn't store default sftp path.\n");
                 exit(EXIT_FAILURE);
             }
         }
@@ -1903,18 +1779,18 @@ THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
             /* Get the local IP address for the socket.
              * 0.0.0.0 if ip adder any */
             if (NU_Get_Sock_Name(listenFd, &sock, &addrLength) != NU_SUCCESS) {
-                XFPRINTF(stderr, "Couldn't find network.\r\n");
+                fprintf(stderr, "Couldn't find network.\r\n");
                 exit(EXIT_FAILURE);
             }
 
             WMEMCPY(ipaddr, &sock.ip_num, MAX_ADDRESS_SIZE);
             NU_Inet_NTOP(NU_FAMILY_IP, &ipaddr[0], buf, 16);
-            XFPRINTF(stdout, "Listening on %s:%d\r\n", buf, port);
+            fprintf(stdout, "Listening on %s:%d\r\n", buf, port);
         }
     #endif
 
-    #ifndef WOLFSSH_USER_IO
         SignalTcpReady(serverArgs, port);
+
     #ifdef WOLFSSL_NUCLEUS
         clientFd = NU_Accept(listenFd, &clientAddr, 0);
     #else
@@ -1928,12 +1804,6 @@ THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
             tcp_set_nonblocking(&clientFd);
 
         wolfSSH_set_fd(ssh, (int)clientFd);
-    #else
-        /* for USER_IO */
-        /* wolfSSH_SetIOReadCtx(ssh, (int)clientR);*/
-        /* wolfSSH_SetIOWriteCtx(ssh, (int)clientW);*/
-        wolfSSH_set_fd(ssh, (int)clientFd);
-    #endif
 
 #if defined(WOLFSSL_PTHREADS) && defined(WOLFSSL_TEST_GLOBAL_REQ)
         threadCtx->ctx = ctx;
@@ -1954,7 +1824,7 @@ THREAD_RETURN WOLFSSH_THREAD echoserver_test(void* args)
     PwMapListDelete(&pwMapList);
     wolfSSH_CTX_free(ctx);
     if (wolfSSH_Cleanup() != WS_SUCCESS) {
-        XFPRINTF(stderr, "Couldn't clean up wolfSSH.\n");
+        fprintf(stderr, "Couldn't clean up wolfSSH.\n");
         exit(EXIT_FAILURE);
     }
 #if defined(HAVE_ECC) && defined(FP_ECC) && defined(HAVE_THREAD_LS)

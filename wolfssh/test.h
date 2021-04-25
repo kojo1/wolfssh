@@ -102,6 +102,8 @@
     #endif
 
     #define NUM_SOCKETS 5
+#elif defined(WOLFSSH_USER_IO)
+    /* user network I/O */
 #else /* USE_WINDOWS_API */
     #include <unistd.h>
     #include <netdb.h>
@@ -323,7 +325,8 @@ static INLINE int mygetopt(int argc, char** argv, const char* optstring)
     * - 4996: deprecated function */
 #endif
 
-#if (defined(WOLFSSH_TEST_CLIENT) || defined(WOLFSSH_TEST_SERVER)) && !defined(FREESCALE_MQX)
+#if (defined(WOLFSSH_TEST_CLIENT) || defined(WOLFSSH_TEST_SERVER)) && !defined(FREESCALE_MQX)\
+    && !defined(WOLFSSH_USER_IO)
 
 #ifdef WOLFSSL_NUCLEUS
 static INLINE void build_addr(struct addr_struct* addr, const char* peer,
@@ -534,7 +537,7 @@ static INLINE void tcp_socket(WS_SOCKET_T* sockFd)
 #endif
 
 
-#if defined(WOLFSSH_TEST_SERVER) && !defined(FREESCALE_MQX)
+#if defined(WOLFSSH_TEST_SERVER) && !defined(FREESCALE_MQX) && !defined(WOLFSSH_USER_IO)
 
 static INLINE void tcp_listen(WS_SOCKET_T* sockfd, word16* port, int useAnyAddr)
 {
@@ -607,7 +610,8 @@ enum {
     WS_SELECT_ERROR_READY
 };
 
-#if (defined(WOLFSSH_TEST_SERVER) || defined(WOLFSSH_TEST_CLIENT)) && !defined(FREESCALE_MQX)
+#if (defined(WOLFSSH_TEST_SERVER) || defined(WOLFSSH_TEST_CLIENT)) && !defined(FREESCALE_MQX)\
+    && !defined(WOLFSSH_USER_IO)
 
 static INLINE void tcp_set_nonblocking(WS_SOCKET_T* sockfd)
 {
